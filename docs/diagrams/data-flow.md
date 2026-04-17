@@ -1,26 +1,41 @@
-# Поток данных
+# Data Flow
 
 ```mermaid
-flowchart TD
-    user[Сообщение / команда пользователя] --> api[API Layer]
-    api --> orch[Orchestrator]
-    orch --> broker[T-Invest API]
-    orch --> market[Market / Macro Sources]
-    broker --> rawp[Временный broker payload]
-    market --> rawm[Временный market payload]
-    rawp --> mem[(Memory Storage)]
-    rawm --> analytics[(Analytics Storage)]
-    mem --> calc[Детерминированная аналитика]
-    analytics --> calc
-    calc --> snap[Analytics snapshot]
-    snap --> mem
-    mem --> llm[Ограниченный LLM context]
-    snap --> llm
-    llm --> answer[Grounded response]
-    calc --> viz[Подготовленный dataset для графика]
-    viz --> sandbox[Sandbox Renderer]
-    sandbox --> artifacts[(Artifact refs в User Storage)]
-    orch --> logs[Логи / метрики / трассы]
+flowchart LR
+    user[User message/command] --> gateway[Client Interface]
+    gateway --> orchestrator[Orchestrator]
+
+    orchestrator --> toolgw[Retriever / Tool Gateway]
+    toolgw --> tinvest[T-Invest API]
+    toolgw --> market[Market/Macro providers]
+
+    tinvest --> normp[Normalize to PortfolioSnapshot]
+    market --> norma[Normalize indicators/mappings]
+
+    normp --> memory[(Memory Storage)]
+    norma --> analytics[(Analytics Storage)]
+
+    memory --> engine[Deterministic Analytics Engine]
+    analytics --> engine
+    memory --> strategy[StructuredStrategy]
+    strategy --> engine
+
+    engine --> ansnap[AnalyticsSnapshot]
+    ansnap --> memory
+
+    orchestrator --> ctx[Compact LLM context builder]
+    memory --> ctx
+    ansnap --> ctx
+    ctx --> llm[LLM Provider]
+    llm --> response[Grounded response]
+    response --> gateway
+
+    orchestrator --> ustore[(User Storage)]
+    response --> ustore
+
+    orchestrator --> obs[Logs/metrics/traces]
+    toolgw --> obs
+    llm --> obs
 ```
 
-Хранение минимизируется: сырые payloads по возможности остаются временными, snapshots живут по TTL, артефакты хранятся по ссылке, а логи содержат технические события вместо секретов и полных чувствительных payloads.
+Поток отделяет три класса данных: операционные (`session/request`), доменные (`StructuredStrategy`, snapshots, indicators) и наблюдаемость (`logs/traces`). В storage сохраняются нормализованные сущности с TTL/freshness, а в telemetry пишутся только технические события без секретов.

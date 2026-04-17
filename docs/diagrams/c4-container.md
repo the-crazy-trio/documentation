@@ -1,44 +1,50 @@
-# C4 Container Diagram
+# C4 Container
 
 ```mermaid
-flowchart TB
-    ui[Telegram Bot / Mini App]
-    api[API Layer]
-    orch[Orchestrator]
-    sp[Strategy Parser]
-    pa[Portfolio Analytics Engine]
-    tq[Text2SQL / Text2API Path]
-    viz[Visualization Service]
-    rt[Retriever / Tool Layer]
-    userdb[(User Storage)]
-    memdb[(Memory Storage)]
-    adb[(Analytics Storage)]
-    llm[OpenRouter LLMs]
-    broker[T-Invest API]
-    market[Market / Macro Providers]
-    sandbox[Sandbox Renderer]
-    obs[Observability / Evals]
+flowchart LR
+    user[Investor]
+    frontend[Frontend<br/>Telegram/CLI Gateway]
 
-    ui --> api
-    api --> orch
-    orch --> sp
-    orch --> pa
-    orch --> tq
-    orch --> viz
-    orch --> rt
-    orch --> obs
-    sp --> llm
-    tq --> llm
-    orch --> llm
-    rt --> broker
-    rt --> market
-    rt --> userdb
-    rt --> memdb
-    rt --> adb
-    pa --> adb
-    pa --> memdb
-    viz --> sandbox
-    viz --> userdb
+    subgraph backend[Backend PoC]
+        orchestrator[Orchestrator Service]
+        workflows[Workflow Layer<br/>fixed workflows]
+        analytics[Deterministic Analytics Engine]
+        retriever[Retriever Gateway]
+        tools[Tool Layer<br/>portfolio_collect/show,<br/>strategy_save/fit,<br/>guarded query]
+        response[Response Synthesis Adapter]
+        validation[Validation Gate]
+    end
+
+    subgraph data[Storage Layer]
+        userdb[(User Storage)]
+        memorydb[(Memory Storage)]
+        analyticsdb[(Analytics Storage)]
+    end
+
+    obs[Observability / Evals]
+    llm[OpenRouter]
+    tinvest[T-Invest API<br/>read-only]
+    market[Market/Macro Providers]
+
+    user --> frontend
+    frontend --> orchestrator
+    orchestrator --> workflows
+    workflows --> analytics
+    workflows --> retriever
+    retriever --> tools
+    tools --> tinvest
+    tools --> market
+    tools --> memorydb
+    tools --> analyticsdb
+    orchestrator --> validation
+    validation --> response
+    response --> llm
+    orchestrator --> userdb
+    workflows --> memorydb
+    analytics --> analyticsdb
+    orchestrator --> obs
+    tools --> obs
+    response --> obs
 ```
 
-Оркестратор владеет request flow. Только ограниченные контейнеры имеют право вызывать LLM, а детерминированная аналитика остается вне генеративного контура.
+Диаграмма разделяет ответственность контейнеров: workflow и аналитика принимают решения детерминированно, tool layer изолирует внешние источники, а LLM используется только на этапах классификации/синтеза через контролируемые адаптеры.

@@ -1,25 +1,31 @@
-# C4 Context Diagram
+# C4 Context
 
 ```mermaid
-flowchart TB
+flowchart LR
     user[Частный инвестор]
-    ui[Telegram Bot / Mini App]
-    system[Financial AI Assistant PoC]
-    llm[OpenRouter LLMs]
-    broker[T-Invest API]
-    market[Источники market / macro data]
-    sandbox[Sandbox Renderer]
-    storage[(User / Memory / Analytics Storage)]
-    obs[Observability / Evals]
+    client[Client Interface<br/>Telegram/CLI]
 
-    user --> ui
-    ui --> system
-    system --> llm
-    system --> broker
-    system --> market
-    system --> sandbox
-    system --> storage
-    system --> obs
+    subgraph boundary[Financial AI Assistant PoC]
+        orchestrator[Orchestrator + Workflow Layer]
+        retrieval[Retriever / Tool Layer<br/>guarded access]
+        analytics[Deterministic Analytics Engine]
+        storage[(User + Memory + Analytics Storage)]
+        observability[Observability / Evals]
+    end
+
+    llm[OpenRouter / LLM Provider]
+    broker[T-Invest API<br/>read-only]
+    market[Market/Macro Providers]
+
+    user --> client
+    client --> orchestrator
+    orchestrator --> retrieval
+    orchestrator --> analytics
+    orchestrator --> storage
+    orchestrator --> observability
+    retrieval --> broker
+    retrieval --> market
+    orchestrator --> llm
 ```
 
-Граница системы включает backend PoC, его оркестратор, хранилища и execution control logic. Внешние сервисы дают инференс, брокерские данные, рыночные данные и рендеринг, но ответственность за permissioning, validation, fallback и безопасный пользовательский вывод остается внутри системы.
+Границы показывают ответственность: внутри PoC остаются роутинг, validation gate, fallback и user-scope контроль; снаружи только провайдеры данных/LLM без права менять внутренние политики доступа.
